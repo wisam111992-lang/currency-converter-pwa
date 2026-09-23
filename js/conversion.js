@@ -1,9 +1,10 @@
 // Conversion logic — pure functions, no DOM, no storage, no network.
-// Rates are expressed against USD: 1 USD = rates.IQD IQD, 1 USD = rates.TOMAN TOMAN.
+// Rates are expressed against USD: 1 USD = rates.X X for every active currency.
 
 import { BASE_CURRENCY, isKnownCurrency, roundTo } from './currencies.js';
 
-export const RATE_KEYS = Object.freeze(['IQD', 'TOMAN']);
+/** Rates required at all times (the original core currencies). */
+export const REQUIRED_RATE_KEYS = Object.freeze(['IQD', 'TOMAN']);
 
 export class ConversionError extends Error {
   constructor(message) {
@@ -18,28 +19,30 @@ export const MESSAGES = {
   emptyAmount: 'أدخل المبلغ المراد تحويله',
   invalidAmount: 'أدخل مبلغاً صحيحاً',
   unknownCurrency: 'عملة غير مدعومة',
+  missingCurrencyRate: 'لم تحفظ سعر صرف لهذه العملة بعد',
 };
 
-/** Validate raw rates coming from the settings form. */
-export function validateRates(raw) {
-  const errors = {};
-  const rates = { [BASE_CURRENCY]: 1 };
+/** Normalize digits + strip grouping so "1,500" / "١٥٠٠" / "1 500" all work. */
+export function normalizeDigits(text) {
+  const arabic = '٠١٢٣٤٥٦٧٨٩';
+  const persian = '۰۱۲۳۴۵۶۷۸۹';
+  return String(text).replace(/[٠-٩۰-۹]/g, (d) => {
+    const i = arabic.indexOf(d);
+    if (i > -1) return String(i);
+    const j = persian.indexOf(d);
+    return j > -1 ? String(j) : d;
+  });
+}
 
-  for (const key of RATE_KEYS) {
-    const value = Number(raw[key]);
-    if (raw[key] === undefined || raw[key] === null || String(raw[key]).trim() === '') {
-      errors[key] = MESSAGES.missingRates;
-      continue;
-    }
-    if (!Number.isFinite(value) || value <= 0) {
-      errors[key] = MESSAGES.invalidRate;
-      continue;
-    }
-    rates[key] = value;
-  }
-
-  const ok = Object.keys(errors).length === 0;
-  return { ok, rates: ok ? rates : null, errors };
+/** Parse a user-typed rate ("1500" / "1,500" / "0.92" / "١٥٠٠"). */
+export function parseRate(input) {
+  if (input === null || input === undefined) return null;
+  let text = normalizeDigits(String(input).trim());
+  if (text === '') return null;
+  text = text.replace(/[٬,\s\u00a0]/g, '').replace(/[٫]/g, '.');
+  if (!/^\d+(\.\d+)?$/.test(text)) return null;
+  const value = Number(text);
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
 
 /** Parse a user-typed amount string ("2,000,000" / "2.5" / "۲۰۰۰"). */
@@ -50,10 +53,9 @@ export function parseAmount(input) {
   let text = String(input).trim();
   if (text === '') throw new ConversionError(MESSAGES.emptyAmount);
 
-  // normalize Arabic-Indic digits and Persian/Arabic separators
   text = normalizeDigits(text);
-  text = text.replace(/[٬,\s\u00a0]/g, ''); // thousands separators + spaces
-  text = text.replace(/[٫]/g, '.');         // Arabic decimal separator
+  text = text.replace(/[٬,\s\u00a0]/g, '');
+  text = text.replace(/[٫]/g, '.');
 
   if (!/^-?\d*(\.\d+)?$/.test(text) || text === '' || text === '.' || text === '-') {
     throw new ConversionError(MESSAGES.invalidAmount);
@@ -66,21 +68,51 @@ export function parseAmount(input) {
   return value;
 }
 
-export function normalizeDigits(text) {
-  const arabic = '٠١٢٣٤٥٦٧٨٩';
-  const persian = '۰۱۲۳۴۵۶۷۸۹';
-  return String(text).replace(/[٠-٩۰-۹]/g, (d) => {
-    const i = arabic.indexOf(d);
-    if (i > -1) return String(i);
-    const j = persian.indexOf(d);
-    return j > -1 ? String(j) : d;
-  });
+/**
+ * Validate rates coming from the settings form / storage.
+ * - core (IQD, TOMAN) are required
+ * - any known world currency present in `raw` is optional but must be > 0
+ * - unknown codes are ignored (keeps old/corrupt data loadable)
+ * @param {Record<string, string|number>} raw
+ * @returns {{ok: boolean, rates: Record<string, number>|null, errors: Record<string, string>}}
+ */
+export function validateRates(raw) {
+  const errors = {};
+  const rates = { [BASE_CURRENCY]: 1 };
+  const input = raw && typeof raw === 'object' ? raw : {};
+
+  const keys = new Set([...REQUIRED_RATE_KEYS, ...Object.keys(input)]);
+
+  for (const key of keys) {
+    if (key === BASE_CURRENCY) continue;
+    if (!isKnownCurrency(key)) continue;
+
+    const required = REQUIRED_RATE_KEYS.includes(key);
+    const rawValue = input[key];
+    const missing =
+      rawValue === undefined || rawValue === null || String(rawValue).trim() === '';
+
+    if (missing) {
+      if (required) errors[key] = MESSAGES.missingRates;
+      continue;
+    }
+
+    const value = parseRate(rawValue);
+    if (value === null) {
+      errors[key] = MESSAGES.invalidRate;
+      continue;
+    }
+    rates[key] = value;
+  }
+
+  const ok = Object.keys(errors).length === 0;
+  return { ok, rates: ok ? rates : null, errors };
 }
 
 /** Rates required for conversion must be present and positive. */
 export function assertRates(rates) {
   if (!rates) throw new ConversionError(MESSAGES.missingRates);
-  for (const key of RATE_KEYS) {
+  for (const key of REQUIRED_RATE_KEYS) {
     const value = Number(rates[key]);
     if (!Number.isFinite(value) || value <= 0) {
       throw new ConversionError(MESSAGES.invalidRate);
@@ -102,13 +134,23 @@ export function convert(amount, from, to, rates) {
 
   const fromRate = from === BASE_CURRENCY ? 1 : Number(rates[from]);
   const toRate = to === BASE_CURRENCY ? 1 : Number(rates[to]);
-  if (!fromRate || !toRate) throw new ConversionError(MESSAGES.missingRates);
+
+  if (!fromRate || !Number.isFinite(fromRate) || fromRate <= 0) {
+    throw new ConversionError(
+      from === BASE_CURRENCY ? MESSAGES.missingRates : MESSAGES.missingCurrencyRate
+    );
+  }
+  if (!toRate || !Number.isFinite(toRate) || toRate <= 0) {
+    throw new ConversionError(
+      to === BASE_CURRENCY ? MESSAGES.missingRates : MESSAGES.missingCurrencyRate
+    );
+  }
 
   const inBase = amount / fromRate;
   return roundTo(inBase * toRate, 8);
 }
 
-/** Convert one amount to every supported currency. */
+/** Convert one amount to every provided currency code. */
 export function convertToAll(amount, from, rates, codes) {
   return codes.map((code) => ({
     code,

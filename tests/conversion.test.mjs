@@ -7,10 +7,16 @@ import {
   convert,
   convertToAll,
   parseAmount,
+  parseRate,
   validateRates,
   MESSAGES,
 } from '../js/conversion.js';
-import { CURRENCIES, formatAmount, formatNumber } from '../js/currencies.js';
+import {
+  CORE_CURRENCIES,
+  WORLD_CATALOG,
+  formatAmount,
+  formatNumber,
+} from '../js/currencies.js';
 
 let passed = 0;
 const failures = [];
@@ -57,7 +63,7 @@ test('20 USD → 2,000,000 TOMAN', () => {
 console.log('\n— كل الاتجاهات الستة —');
 
 test('all 6 directions round-trip consistently', () => {
-  const codes = CURRENCIES.map((c) => c.code);
+  const codes = CORE_CURRENCIES.map((c) => c.code);
   const amount = 1234.56;
   for (const from of codes) {
     for (const to of codes) {
@@ -168,6 +174,106 @@ test('tiny values are not rounded to zero', () => {
   const tiny = convert(1, 'IQD', 'USD', RATES); // 0.000666...
   assert.ok(tiny > 0);
   assert.equal(formatAmount(tiny, 'USD'), '0.000667 USD');
+});
+
+console.log('\n— عملات العالم —');
+
+const WORLD_RATES = { IQD: 1500, TOMAN: 100000, EUR: 0.92, SAR: 3.75, JPY: 150 };
+
+test('world catalog has no duplicate or reserved codes', () => {
+  const codes = WORLD_CATALOG.map((c) => c.code);
+  assert.equal(new Set(codes).size, codes.length, 'no duplicates');
+  assert.ok(!codes.includes('USD'), 'USD not in world catalog');
+  assert.ok(!codes.includes('IQD'), 'IQD not in world catalog');
+  assert.ok(!codes.includes('TOMAN'), 'TOMAN not in world catalog');
+  assert.ok(codes.length >= 60, 'catalog is substantial');
+});
+
+test('world catalog entries have Arabic names', () => {
+  for (const c of WORLD_CATALOG) {
+    assert.ok(c.nameAr && c.nameAr.length > 1, `${c.code} nameAr`);
+    assert.ok(c.shortAr && c.shortAr.length > 1, `${c.code} shortAr`);
+    assert.match(c.code, /^[A-Z]{3}$/, `${c.code} is 3 uppercase letters`);
+    assert.ok(Number.isInteger(c.maxDecimals) && c.maxDecimals >= 0, `${c.code} decimals`);
+  }
+});
+
+test('validateRates accepts optional world currencies', () => {
+  const { ok, rates } = validateRates({
+    IQD: '1500',
+    TOMAN: '100000',
+    EUR: '0.92',
+    SAR: '3,750'.replace('3,750', '3.75'),
+  });
+  assert.equal(ok, true);
+  assert.equal(rates.EUR, 0.92);
+  assert.equal(rates.SAR, 3.75);
+});
+
+test('validateRates ignores unknown codes but keeps core errors', () => {
+  const { ok, errors } = validateRates({ IQD: '1500', TOMAN: '', FAKE: '5' });
+  assert.equal(ok, false);
+  assert.equal(errors.TOMAN, MESSAGES.missingRates);
+  assert.equal(errors.FAKE, undefined);
+});
+
+test('world rate of zero is rejected', () => {
+  const { ok, errors } = validateRates({ IQD: '1500', TOMAN: '100000', EUR: '0' });
+  assert.equal(ok, false);
+  assert.equal(errors.EUR, MESSAGES.invalidRate);
+});
+
+test('parseRate handles grouping, Arabic digits, decimals', () => {
+  assert.equal(parseRate('1500'), 1500);
+  assert.equal(parseRate('1,500'), 1500);
+  assert.equal(parseRate('0.92'), 0.92);
+  assert.equal(parseRate('١٥٠٠'), 1500);
+  assert.equal(parseRate('100000'), 100000);
+  assert.equal(parseRate('0'), null);
+  assert.equal(parseRate('-5'), null);
+  assert.equal(parseRate('abc'), null);
+  assert.equal(parseRate(''), null);
+});
+
+test('USD → EUR → USD round-trip', () => {
+  assert.equal(convert(100, 'USD', 'EUR', WORLD_RATES), 92);
+  assert.ok(Math.abs(convert(92, 'EUR', 'USD', WORLD_RATES) - 100) < 1e-9);
+});
+
+test('world ↔ world via USD base: EUR → SAR', () => {
+  // 92 EUR = 100 USD = 375 SAR
+  assert.equal(convert(92, 'EUR', 'SAR', WORLD_RATES), 375);
+});
+
+test('core ↔ world: 2,000,000 TOMAN → EUR', () => {
+  // 20 USD × 0.92 = 18.4 EUR
+  assert.equal(convert(2_000_000, 'TOMAN', 'EUR', WORLD_RATES), 18.4);
+});
+
+test('JPY uses 0 decimals in display', () => {
+  const jpy = convert(1, 'USD', 'JPY', WORLD_RATES);
+  assert.equal(jpy, 150);
+  assert.equal(formatAmount(jpy, 'JPY'), '150 JPY');
+});
+
+test('convert without a world rate throws missingCurrencyRate', () => {
+  assert.throws(
+    () => convert(100, 'USD', 'EUR', RATES),
+    (e) => e.message === MESSAGES.missingCurrencyRate
+  );
+});
+
+test('convertToAll works across mixed core + world', () => {
+  const out = convertToAll(
+    100,
+    'USD',
+    WORLD_RATES,
+    ['USD', 'IQD', 'TOMAN', 'EUR', 'SAR']
+  );
+  assert.equal(out.find((x) => x.code === 'IQD').value, 150000);
+  assert.equal(out.find((x) => x.code === 'TOMAN').value, 10000000);
+  assert.equal(out.find((x) => x.code === 'EUR').value, 92);
+  assert.equal(out.find((x) => x.code === 'SAR').value, 375);
 });
 
 console.log(`\n${passed} passed, ${failures.length} failed\n`);

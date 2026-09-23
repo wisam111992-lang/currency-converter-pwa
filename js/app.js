@@ -1,12 +1,21 @@
 // UI layer — wires the screens to conversion + storage. No network usage.
+// Supports core currencies (USD/IQD/TOMAN) + world currencies added by the user.
 
-import { CURRENCIES, formatAmount, getCurrency } from './currencies.js';
+import {
+  BASE_CURRENCY,
+  CATALOG_ORDER,
+  CORE_CURRENCIES,
+  getAvailableWorldCurrencies,
+  getCurrency,
+  formatAmount,
+} from './currencies.js';
 import {
   ConversionError,
   MESSAGES,
   convert,
   normalizeDigits,
   parseAmount,
+  parseRate,
   validateRates,
 } from './conversion.js';
 import {
@@ -28,6 +37,8 @@ function submitForm(form) {
     form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
   }
 }
+
+const CORE_CODES = CORE_CURRENCIES.map((c) => c.code);
 
 const els = {
   screenSetup: $('#screen-setup'),
@@ -57,13 +68,20 @@ const els = {
   ratesTomanError: $('#rates-toman-error'),
   ratesToast: $('#rates-toast'),
   lastUpdate: $('#last-update'),
+  worldList: $('#world-rates-list'),
+  worldEmpty: $('#world-empty'),
+  addSelect: $('#add-currency-select'),
+  addRate: $('#add-currency-rate'),
+  addBtn: $('#btn-add-currency'),
+  addError: $('#add-currency-error'),
   historySection: $('#history-section'),
   historyList: $('#history-list'),
   clearHistory: $('#btn-clear-history'),
 };
 
-let rates = null; // { IQD, TOMAN } against 1 USD
-let lastResult = null; // { from, amount, targets }
+let rates = null; // saved: { USD:1, IQD, TOMAN, ...world }
+let ratesDraft = null; // working copy while the rates screen is open
+let lastResult = null; // { from, amount }
 
 /* ─────────────── helpers ─────────────── */
 
@@ -85,20 +103,28 @@ function setError(input, errorEl, message) {
   }
 }
 
-function fillCurrencySelects() {
-  const options = CURRENCIES.map(
-    (c) => `<option value="${c.code}">${c.shortAr}</option>`
-  ).join('');
-  els.fromCurrency.innerHTML = options;
-  els.toCurrency.innerHTML = options;
-  els.fromCurrency.value = 'TOMAN';
-  els.toCurrency.value = 'IQD';
+/** Active currency codes in display order (core first, then added world). */
+function activeCodes() {
+  const source = rates || {};
+  const saved = new Set(Object.keys(source));
+  saved.add(BASE_CURRENCY);
+  return CATALOG_ORDER.filter((code) => saved.has(code));
 }
 
-/** Keep only digits / separators while typing; show grouped thousands. */
-function sanitizeAmountInput(raw) {
-  let text = normalizeDigits(raw); // Arabic/Persian digits → 0-9
-  text = text.replace(/[^\d.]/g, ''); // allow digits + one decimal point
+function activeCurrencies() {
+  return activeCodes().map(getCurrency).filter(Boolean);
+}
+
+function worldCodesOf(ratesMap) {
+  return Object.keys(ratesMap || {})
+    .filter((code) => code !== BASE_CURRENCY && !CORE_CODES.includes(code))
+    .sort((a, b) => CATALOG_ORDER.indexOf(a) - CATALOG_ORDER.indexOf(b));
+}
+
+/** Keep only digits + one decimal point; group thousands while typing. */
+function sanitizeNumeric(raw) {
+  let text = normalizeDigits(raw);
+  text = text.replace(/[^\d.]/g, '');
   const firstDot = text.indexOf('.');
   if (firstDot !== -1) {
     text = text.slice(0, firstDot + 1) + text.slice(firstDot + 1).replace(/\./g, '');
@@ -106,22 +132,75 @@ function sanitizeAmountInput(raw) {
   return text;
 }
 
-function groupIntegerPart(text) {
+function groupNumeric(text) {
   if (text === '' || text === '.') return text;
   const [intPart, ...rest] = text.split('.');
   const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return rest.length ? `${grouped}.${rest.join('')}` : grouped;
 }
 
+/** Sanitize + group an input in place (keeps caret at end). */
+function formatNumericInput(input) {
+  const caretEnd = input.selectionStart === input.value.length;
+  const grouped = groupNumeric(sanitizeNumeric(input.value));
+  if (grouped !== input.value) {
+    input.value = grouped;
+    if (caretEnd) {
+      const pos = grouped.length;
+      try {
+        input.setSelectionRange(pos, pos);
+      } catch {
+        /* some inputs don't support selection */
+      }
+    }
+  }
+  return grouped;
+}
+
+function bindNumericInput(input, onErrorClear) {
+  input.addEventListener('input', () => {
+    formatNumericInput(input);
+    if (onErrorClear) onErrorClear();
+  });
+}
+
+/* ─────────────── currency selects ─────────────── */
+
+function rebuildCurrencySelects() {
+  const prevFrom = els.fromCurrency.value;
+  const prevTo = els.toCurrency.value;
+  const currencies = activeCurrencies();
+  const codes = currencies.map((c) => c.code);
+
+  const html = currencies
+    .map((c) => `<option value="${c.code}">${c.shortAr}</option>`)
+    .join('');
+  els.fromCurrency.innerHTML = html;
+  els.toCurrency.innerHTML = html;
+
+  els.fromCurrency.value = codes.includes(prevFrom)
+    ? prevFrom
+    : codes.includes('TOMAN')
+      ? 'TOMAN'
+      : codes[0];
+
+  const fallbackTo = codes.find((c) => c !== els.fromCurrency.value) || codes[0];
+  els.toCurrency.value =
+    codes.includes(prevTo) && prevTo !== els.fromCurrency.value ? prevTo : fallbackTo;
+}
+
 /* ─────────────── results rendering ─────────────── */
 
 function renderResults(fromCode, amount) {
-  const targets = CURRENCIES.filter((c) => c.code !== fromCode).map((c) => ({
-    code: c.code,
-    value: convert(amount, fromCode, c.code, rates),
-  }));
+  const targets = activeCurrencies()
+    .filter((c) => c.code !== fromCode)
+    .map((c) => ({
+      code: c.code,
+      value: convert(amount, fromCode, c.code, rates),
+    }));
 
-  // primary = selected "to" currency if valid, otherwise first target
+  if (!targets.length) return;
+
   const toCode = els.toCurrency.value;
   const primary =
     targets.find((t) => t.code === toCode) ||
@@ -130,7 +209,7 @@ function renderResults(fromCode, amount) {
 
   const primaryCur = getCurrency(primary.code);
   els.primaryValue.textContent = formatAmount(primary.value, primary.code);
-  els.primaryCode.textContent = `${primaryCur.nameAr}`;
+  els.primaryCode.textContent = primaryCur.nameAr;
 
   els.others.innerHTML = targets
     .filter((t) => t.code !== primary.code)
@@ -145,10 +224,9 @@ function renderResults(fromCode, amount) {
     .join('');
 
   els.results.hidden = false;
-  lastResult = { from: fromCode, amount, primary };
+  lastResult = { from: fromCode, amount };
 
-  // history: only record the visible conversion (from → primary),
-  // skip if identical to the most recent entry (auto re-render on currency change)
+  // history: record the visible conversion (from → primary), skip exact duplicates
   const entry = {
     from: { code: fromCode, value: amount },
     to: { code: primary.code, value: primary.value },
@@ -185,9 +263,28 @@ function renderHistory() {
     .join('');
 }
 
-/* ─────────────── events ─────────────── */
+/** Re-run the last conversion with current rates (if results are on screen). */
+function refreshLiveResult() {
+  if (!lastResult || els.amount.value.trim() === '') return;
+  if (!activeCodes().includes(lastResult.from)) {
+    els.results.hidden = true;
+    lastResult = null;
+    return;
+  }
+  try {
+    const amount = parseAmount(els.amount.value);
+    renderResults(lastResult.from, amount);
+  } catch {
+    /* keep previous results */
+  }
+}
+
+/* ─────────────── setup screen ─────────────── */
 
 function bindSetup() {
+  bindNumericInput(els.setupIqd, () => setError(els.setupIqd, els.setupIqdError, null));
+  bindNumericInput(els.setupToman, () => setError(els.setupToman, els.setupTomanError, null));
+
   els.setupForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const raw = { IQD: els.setupIqd.value, TOMAN: els.setupToman.value };
@@ -199,24 +296,15 @@ function bindSetup() {
 
     const saved = saveRates(next);
     rates = saved.usdRates;
+    rebuildCurrencySelects();
     enterMain();
   });
 }
 
+/* ─────────────── converter screen ─────────────── */
+
 function bindConverter() {
-  els.amount.addEventListener('input', () => {
-    const caretEnd = els.amount.selectionStart === els.amount.value.length;
-    const sanitized = sanitizeAmountInput(els.amount.value);
-    const grouped = groupIntegerPart(sanitized);
-    if (grouped !== els.amount.value) {
-      els.amount.value = grouped;
-      if (caretEnd) {
-        const pos = grouped.length;
-        els.amount.setSelectionRange(pos, pos);
-      }
-    }
-    setError(els.amount, els.amountError, null);
-  });
+  bindNumericInput(els.amount, () => setError(els.amount, els.amountError, null));
 
   els.convertForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -239,16 +327,8 @@ function bindConverter() {
       return;
     }
 
-    const fromCode = els.fromCurrency.value;
-    const toCode = els.toCurrency.value;
-    if (fromCode === toCode) {
-      // still valid: show identity + the other currency
-      renderResults(fromCode, amount);
-      return;
-    }
-
     try {
-      renderResults(fromCode, amount);
+      renderResults(els.fromCurrency.value, amount);
     } catch (err) {
       setError(
         els.amount,
@@ -264,33 +344,22 @@ function bindConverter() {
     const to = els.toCurrency.value;
     els.fromCurrency.value = to;
     els.toCurrency.value = from;
-
-    // re-run conversion with the kept amount, if there is one
-    if (rates && els.amount.value.trim() !== '') {
-      submitForm(els.convertForm);
-    }
+    if (rates && els.amount.value.trim() !== '') submitForm(els.convertForm);
   });
 
-  els.fromCurrency.addEventListener('change', () => {
+  const onCurrencyChange = () => {
     if (els.fromCurrency.value === els.toCurrency.value) {
-      const other = CURRENCIES.find((c) => c.code !== els.fromCurrency.value);
-      els.toCurrency.value = other.code;
+      const other = activeCodes().find((c) => c !== els.fromCurrency.value);
+      if (other) els.toCurrency.value = other;
+    } else if (els.toCurrency.value === els.fromCurrency.value) {
+      const other = activeCodes().find((c) => c !== els.toCurrency.value);
+      if (other) els.fromCurrency.value = other;
     }
-    if (rates && els.amount.value.trim() !== '') {
-      submitForm(els.convertForm);
-    }
-  });
+    if (rates && els.amount.value.trim() !== '') submitForm(els.convertForm);
+  };
 
-  els.toCurrency.addEventListener('change', () => {
-    // prevent from === to
-    if (els.toCurrency.value === els.fromCurrency.value) {
-      const other = CURRENCIES.find((c) => c.code !== els.toCurrency.value);
-      els.fromCurrency.value = other.code;
-    }
-    if (rates && els.amount.value.trim() !== '') {
-      submitForm(els.convertForm);
-    }
-  });
+  els.fromCurrency.addEventListener('change', onCurrencyChange);
+  els.toCurrency.addEventListener('change', onCurrencyChange);
 
   els.clearHistory.addEventListener('click', () => {
     clearHistory();
@@ -298,37 +367,151 @@ function bindConverter() {
   });
 }
 
+/* ─────────────── rates settings screen ─────────────── */
+
+function renderWorldRows() {
+  const codes = worldCodesOf(ratesDraft);
+  els.worldEmpty.hidden = codes.length > 0;
+
+  els.worldList.innerHTML = codes
+    .map((code) => {
+      const cur = getCurrency(code);
+      const value = ratesDraft[code] ?? '';
+      return `
+        <div class="world-row" data-code="${code}">
+          <div class="world-row-top">
+            <span class="world-name">${cur.nameAr} <span class="world-code">${code}</span></span>
+            <button type="button" class="btn btn-text" data-del="${code}">حذف</button>
+          </div>
+          <div class="rate-row">
+            <label class="rate-label" for="rate-${code}">1 USD =</label>
+            <input
+              id="rate-${code}"
+              class="rate-input"
+              type="text"
+              inputmode="decimal"
+              autocomplete="off"
+              data-rate="${code}"
+              value="${groupNumeric(String(value))}"
+            />
+            <span class="rate-suffix">${code}</span>
+          </div>
+          <p class="field-error" data-error="${code}" hidden></p>
+        </div>`;
+    })
+    .join('');
+}
+
+function fillAddSelect() {
+  const available = getAvailableWorldCurrencies(Object.keys(ratesDraft || {}));
+  const html = available
+    .map((c) => `<option value="${c.code}">${c.nameAr} (${c.code})</option>`)
+    .join('');
+  els.addSelect.innerHTML =
+    html || '<option value="" disabled selected>تمت إضافة كل العملات</option>';
+  els.addSelect.disabled = available.length === 0;
+  els.addBtn.disabled = available.length === 0;
+}
+
+function openRatesScreen() {
+  ratesDraft = { ...(rates || {}) };
+  els.ratesIqd.value = ratesDraft.IQD ? groupNumeric(String(ratesDraft.IQD)) : '';
+  els.ratesToman.value = ratesDraft.TOMAN ? groupNumeric(String(ratesDraft.TOMAN)) : '';
+  setError(els.ratesIqd, els.ratesIqdError, null);
+  setError(els.ratesToman, els.ratesTomanError, null);
+  setError(null, els.addError, null);
+  els.addRate.value = '';
+  els.addRate.classList.remove('invalid');
+  renderWorldRows();
+  fillAddSelect();
+  show(els.screenRates);
+}
+
 function bindRates() {
-  els.openRates.addEventListener('click', () => {
-    els.ratesIqd.value = rates?.IQD ?? '';
-    els.ratesToman.value = rates?.TOMAN ?? '';
-    setError(els.ratesIqd, els.ratesIqdError, null);
-    setError(els.ratesToman, els.ratesTomanError, null);
-    show(els.screenRates);
-  });
+  bindNumericInput(els.ratesIqd, () => setError(els.ratesIqd, els.ratesIqdError, null));
+  bindNumericInput(els.ratesToman, () => setError(els.ratesToman, els.ratesTomanError, null));
+  bindNumericInput(els.addRate, () => setError(els.addRate, els.addError, null));
+
+  els.openRates.addEventListener('click', openRatesScreen);
 
   els.closeRates.addEventListener('click', () => {
     if (rates) show(els.screenMain);
     else show(els.screenSetup);
   });
 
+  // world rows: live edit + delete (delegated)
+  els.worldList.addEventListener('input', (e) => {
+    const input = e.target.closest('[data-rate]');
+    if (!input) return;
+    formatNumericInput(input);
+    const code = input.dataset.rate;
+    ratesDraft[code] = input.value;
+    const err = els.worldList.querySelector(`[data-error="${code}"]`);
+    setError(input, err, null);
+  });
+
+  els.worldList.addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del]');
+    if (!del) return;
+    delete ratesDraft[del.dataset.del];
+    renderWorldRows();
+    fillAddSelect();
+  });
+
+  // add a world currency to the draft
+  els.addBtn.addEventListener('click', () => {
+    setError(null, els.addError, null);
+    els.addRate.classList.remove('invalid');
+
+    const code = els.addSelect.value;
+    if (!code) {
+      setError(null, els.addError, 'اختر عملة أولاً');
+      return;
+    }
+    const value = parseRate(els.addRate.value);
+    if (value === null) {
+      setError(els.addRate, els.addError, MESSAGES.invalidRate);
+      return;
+    }
+    ratesDraft[code] = value;
+    els.addRate.value = '';
+    renderWorldRows();
+    fillAddSelect();
+  });
+
+  // save everything (core + world draft)
   els.ratesForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const raw = { IQD: els.ratesIqd.value, TOMAN: els.ratesToman.value };
-    const { ok, rates: next, errors } = validateRates(raw);
+    ratesDraft = ratesDraft || { ...(rates || {}) };
+    ratesDraft.IQD = els.ratesIqd.value;
+    ratesDraft.TOMAN = els.ratesToman.value;
+
+    const { ok, rates: next, errors } = validateRates(ratesDraft);
 
     setError(els.ratesIqd, els.ratesIqdError, errors.IQD);
     setError(els.ratesToman, els.ratesTomanError, errors.TOMAN);
+
+    // world row errors
+    for (const row of els.worldList.querySelectorAll('.world-row')) {
+      const code = row.dataset.code;
+      const input = row.querySelector('[data-rate]');
+      const err = row.querySelector('[data-error]');
+      setError(input, err, errors[code]);
+    }
+
     if (!ok) return;
 
     const saved = saveRates(next);
     rates = saved.usdRates;
+    ratesDraft = { ...rates };
+    rebuildCurrencySelects();
 
     const stamp = formatTimestamp(saved.updatedAt);
-    els.lastUpdate.textContent = `آخر تحديث يدوي:\n${stamp ?? ''}`;
-    els.lastUpdate.hidden = false;
+    if (stamp) {
+      els.lastUpdate.textContent = `آخر تحديث يدوي:\n${stamp}`;
+      els.lastUpdate.hidden = false;
+    }
 
-    // toast
     els.ratesToast.textContent = 'تم حفظ أسعار الصرف';
     els.ratesToast.hidden = false;
     clearTimeout(bindRates._t);
@@ -336,27 +519,21 @@ function bindRates() {
       els.ratesToast.hidden = true;
     }, 2200);
 
-    // refresh a live conversion if one is on screen
-    if (lastResult && els.amount.value.trim() !== '') {
-      try {
-        const amount = parseAmount(els.amount.value);
-        renderResults(lastResult.from, amount);
-      } catch {
-        /* keep old results */
-      }
-    }
+    refreshLiveResult();
+    renderWorldRows();
+    fillAddSelect();
   });
 }
 
 /* ─────────────── boot ─────────────── */
 
 function enterMain() {
+  rebuildCurrencySelects();
   show(els.screenMain);
   renderHistory();
 }
 
 function init() {
-  fillCurrencySelects();
   bindSetup();
   bindConverter();
   bindRates();
@@ -371,6 +548,7 @@ function init() {
     }
     enterMain();
   } else {
+    rebuildCurrencySelects();
     show(els.screenSetup);
   }
 

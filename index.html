@@ -26,6 +26,7 @@
           <img class="setup-logo" src="./icons/icon-192.png" alt="" width="72" height="72" />
           <h1>مرحباً بك</h1>
           <p>حدد أسعار الصرف التي تريد استخدامها</p>
+          <p class="setup-hint">يمكنك إضافة عملات العالم لاحقاً من صفحة «أسعار الصرف».</p>
         </div>
 
         <form id="setup-form" class="card" novalidate>
@@ -174,6 +175,33 @@
                 <span class="rate-suffix">TOMAN</span>
               </div>
               <p class="field-error" id="rates-toman-error" hidden></p>
+            </div>
+
+            <div class="card rate-card">
+              <h2>العملات العالمية المحفوظة</h2>
+              <div id="world-rates-list" class="world-list"></div>
+              <p id="world-empty" class="muted-note">
+                لم تضف أي عملة عالمية بعد — مثل اليورو، الريال السعودي، الجنيه المصري…
+              </p>
+            </div>
+
+            <div class="card rate-card">
+              <h2>إضافة عملة عالمية</h2>
+              <p class="muted-note">اختر عملة ثم أدخل سعرها مقابل 1 دولار.</p>
+              <div class="add-currency-row">
+                <select id="add-currency-select" class="select" aria-label="اختر عملة"></select>
+                <input
+                  id="add-currency-rate"
+                  class="rate-input add-rate-input"
+                  type="text"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  placeholder="مثال: 0.92"
+                  aria-label="سعر الصرف مقابل الدولار"
+                />
+                <button id="btn-add-currency" class="btn btn-secondary" type="button">إضافة</button>
+              </div>
+              <p class="field-error" id="add-currency-error" hidden></p>
             </div>
 
             <button type="submit" class="btn btn-primary btn-block btn-lg">حفظ</button>

@@ -1,6 +1,6 @@
 /* Service Worker — offline-first cache. No network calls for rates, ever. */
 
-const CACHE_NAME = 'currency-converter-v1';
+const CACHE_NAME = 'currency-converter-v2'; // bump on every release → devices refresh
 
 const PRECACHE_URLS = [
   './',

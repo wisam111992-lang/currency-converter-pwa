@@ -32,18 +32,15 @@ function safeRemove(key) {
 }
 
 /**
- * Load saved rates.
- * @returns {{usdRates: {IQD:number,TOMAN:number}|null, updatedAt: string|null}}
+ * Load saved rates (core + any world currencies the user added).
+ * @returns {{usdRates: Record<string, number>|null, updatedAt: string|null}}
  */
 export function loadRates() {
   const raw = safeGet(KEY_RATES);
   if (!raw) return { usdRates: null, updatedAt: null };
   try {
     const parsed = JSON.parse(raw);
-    const check = validateRates({
-      IQD: parsed?.rates?.IQD,
-      TOMAN: parsed?.rates?.TOMAN,
-    });
+    const check = validateRates(parsed?.rates ?? {});
     if (!check.ok) return { usdRates: null, updatedAt: null };
     return {
       usdRates: check.rates,

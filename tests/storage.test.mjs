@@ -84,6 +84,45 @@ test('corrupted storage returns null instead of crashing', () => {
   saveRates({ IQD: 1500, TOMAN: 100000 });
 });
 
+test('world currencies persist alongside core rates', () => {
+  saveRates({ IQD: 1500, TOMAN: 100000, EUR: 0.92, SAR: 3.75, JPY: 150 });
+  const loaded = loadRates();
+  assert.equal(loaded.usdRates.EUR, 0.92);
+  assert.equal(loaded.usdRates.SAR, 3.75);
+  assert.equal(loaded.usdRates.JPY, 150);
+  assert.equal(loaded.usdRates.IQD, 1500, 'core kept');
+});
+
+test('deleting a world currency removes it from storage', () => {
+  const current = loadRates().usdRates;
+  const { EUR, ...withoutEur } = current; // eslint-disable-line no-unused-vars
+  saveRates(withoutEur);
+  const loaded = loadRates();
+  assert.equal(loaded.usdRates.EUR, undefined);
+  assert.equal(loaded.usdRates.SAR, 3.75, 'others kept');
+  assert.equal(loaded.usdRates.IQD, 1500);
+});
+
+test('legacy storage (core only, no world keys) still loads', () => {
+  window.localStorage.setItem(
+    'currency_converter.rates.v1',
+    JSON.stringify({
+      rates: { USD: 1, IQD: 1500, TOMAN: 100000 },
+      updatedAt: '2026-09-23T20:30:00.000Z',
+    })
+  );
+  const loaded = loadRates();
+  assert.deepEqual(loaded.usdRates, { USD: 1, IQD: 1500, TOMAN: 100000 });
+});
+
+test('storage with invalid core rates is treated as not configured', () => {
+  window.localStorage.setItem(
+    'currency_converter.rates.v1',
+    JSON.stringify({ rates: { IQD: 0, TOMAN: -1 }, updatedAt: null })
+  );
+  assert.equal(loadRates().usdRates, null);
+});
+
 console.log('\n— سجل التحويلات —');
 
 test('history empty initially', () => {

@@ -154,6 +154,12 @@ body {
   padding: 32px 8px 24px;
 }
 
+.setup-hint {
+  margin-top: 8px !important;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 .setup-logo {
   border-radius: 20px;
   box-shadow: var(--shadow);
@@ -502,6 +508,97 @@ body {
   margin: 0 0 12px;
   font-size: 1.05rem;
   font-weight: 800;
+}
+
+.muted-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.btn-secondary {
+  background: var(--primary-soft);
+  color: var(--primary);
+  padding: 13px 18px;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── world currencies in settings ── */
+.world-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.world-list:empty + .world-empty {
+  display: block;
+}
+
+.world-row {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--bg);
+}
+
+.world-row + .world-row {
+  margin-top: 0;
+}
+
+.world-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.world-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.world-code {
+  display: inline-block;
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-radius: 6px;
+  padding: 1px 7px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-inline-start: 6px;
+  direction: ltr;
+  vertical-align: middle;
+}
+
+.add-currency-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.add-currency-row .select {
+  flex: 1 1 100%;
+}
+
+.add-rate-input {
+  flex: 1 1 120px;
+  text-align: center;
+}
+
+.add-currency-row .btn-secondary {
+  flex: 0 0 auto;
+}
+
+.add-currency-row + .field-error {
+  margin-top: 10px;
 }
 
 .toast {
