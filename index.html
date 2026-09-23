@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#1d4ed8" />
+    <meta name="description" content="محول العملات — حاسبة تحويل بين الدولار والدينار العراقي والتومان، تعمل بدون إنترنت." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="محول العملات" />
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="./css/style.css" />
+    <title>محول العملات</title>
+  </head>
+  <body>
+    <div id="app">
+      <!-- ═══════════ شاشة الإعداد الأولي ═══════════ -->
+      <section id="screen-setup" class="screen" hidden>
+        <div class="setup-hero">
+          <img class="setup-logo" src="./icons/icon-192.png" alt="" width="72" height="72" />
+          <h1>مرحباً بك</h1>
+          <p>حدد أسعار الصرف التي تريد استخدامها</p>
+        </div>
+
+        <form id="setup-form" class="card" novalidate>
+          <div class="rate-row">
+            <label class="rate-label" for="setup-iqd">1 دولار =</label>
+            <input
+              id="setup-iqd"
+              name="IQD"
+              class="rate-input"
+              type="text"
+              inputmode="decimal"
+              autocomplete="off"
+              placeholder="1500"
+              aria-label="سعر صرف الدينار العراقي"
+            />
+            <span class="rate-suffix">دينار عراقي</span>
+          </div>
+          <p class="field-error" id="setup-iqd-error" hidden></p>
+
+          <div class="rate-row">
+            <label class="rate-label" for="setup-toman">1 دولار =</label>
+            <input
+              id="setup-toman"
+              name="TOMAN"
+              class="rate-input"
+              type="text"
+              inputmode="decimal"
+              autocomplete="off"
+              placeholder="100000"
+              aria-label="سعر صرف التومان"
+            />
+            <span class="rate-suffix">تومان</span>
+          </div>
+          <p class="field-error" id="setup-toman-error" hidden></p>
+
+          <button type="submit" class="btn btn-primary btn-block">حفظ وبدء الاستخدام</button>
+        </form>
+      </section>
+
+      <!-- ═══════════ شاشة التحويل الرئيسية ═══════════ -->
+      <section id="screen-main" class="screen" hidden>
+        <header class="app-header">
+          <div class="app-header-row">
+            <h1>محول العملات</h1>
+            <button id="btn-open-rates" class="btn btn-ghost" type="button">
+              ⚙ أسعار الصرف
+            </button>
+          </div>
+          <p class="app-subtitle">الأسعار حسب القيم التي قمت بحفظها</p>
+        </header>
+
+        <main class="app-body">
+          <form id="convert-form" class="card convert-card" novalidate>
+            <div class="currency-pair">
+              <div class="pair-side">
+                <label class="pair-label" for="from-currency">من</label>
+                <select id="from-currency" class="select"></select>
+              </div>
+
+              <button id="btn-swap" class="btn-swap" type="button" aria-label="تبديل العملات" title="تبديل العملات">
+                ⇅
+              </button>
+
+              <div class="pair-side">
+                <label class="pair-label" for="to-currency">إلى</label>
+                <select id="to-currency" class="select"></select>
+              </div>
+            </div>
+
+            <label class="amount-label" for="amount-input">المبلغ</label>
+            <input
+              id="amount-input"
+              class="amount-input"
+              type="text"
+              inputmode="decimal"
+              autocomplete="off"
+              placeholder="0"
+              aria-label="المبلغ المراد تحويله"
+            />
+            <p class="field-error" id="amount-error" hidden></p>
+
+            <button type="submit" class="btn btn-primary btn-block btn-lg">تحويل</button>
+          </form>
+
+          <section id="results" class="results" hidden aria-live="polite">
+            <article class="result-card result-primary" data-role="primary">
+              <p class="result-value" id="result-primary-value">—</p>
+              <p class="result-code" id="result-primary-code">—</p>
+            </article>
+            <div id="result-others" class="result-others"></div>
+          </section>
+
+          <section class="history card" id="history-section" hidden>
+            <div class="history-head">
+              <h2>آخر التحويلات</h2>
+              <button id="btn-clear-history" class="btn btn-text" type="button">مسح السجل</button>
+            </div>
+            <ul id="history-list" class="history-list"></ul>
+          </section>
+        </main>
+      </section>
+
+      <!-- ═══════════ صفحة أسعار الصرف ═══════════ -->
+      <section id="screen-rates" class="screen screen-overlay" hidden>
+        <header class="app-header">
+          <div class="app-header-row">
+            <button id="btn-close-rates" class="btn btn-ghost" type="button">→ رجوع</button>
+            <h1>أسعار الصرف</h1>
+            <span class="header-spacer" aria-hidden="true"></span>
+          </div>
+        </header>
+
+        <main class="app-body">
+          <form id="rates-form" class="rates-form" novalidate>
+            <div class="card rate-card">
+              <h2>الدولار والدينار</h2>
+              <div class="rate-row">
+                <label class="rate-label" for="rates-iqd">1 USD =</label>
+                <input
+                  id="rates-iqd"
+                  name="IQD"
+                  class="rate-input"
+                  type="text"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  placeholder="1500"
+                />
+                <span class="rate-suffix">IQD</span>
+              </div>
+              <p class="field-error" id="rates-iqd-error" hidden></p>
+            </div>
+
+            <div class="card rate-card">
+              <h2>الدولار والتومان</h2>
+              <div class="rate-row">
+                <label class="rate-label" for="rates-toman">1 USD =</label>
+                <input
+                  id="rates-toman"
+                  name="TOMAN"
+                  class="rate-input"
+                  type="text"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  placeholder="100000"
+                />
+                <span class="rate-suffix">TOMAN</span>
+              </div>
+              <p class="field-error" id="rates-toman-error" hidden></p>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block btn-lg">حفظ</button>
+          </form>
+
+          <div id="rates-toast" class="toast" hidden role="status"></div>
+
+          <p class="last-update" id="last-update" hidden></p>
+        </main>
+      </section>
+    </div>
+
+    <script type="module" src="./js/app.js"></script>
+  </body>
+</html>
