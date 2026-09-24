@@ -984,6 +984,55 @@ p {
     0 0 0 7px var(--sticky-ring);
 }
 
+/* external lookup link card (under save) — instructions + XE link in one field */
+.lookup-card .muted-note {
+  line-height: 1.7;
+}
+
+.lookup-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 14px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--field-bg);
+  border: 1.5px dashed rgba(99, 102, 241, 0.45);
+  color: var(--accent-text);
+  text-align: center;
+  text-decoration: none;
+  box-shadow: var(--field-inset);
+  transition:
+    transform 0.12s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.lookup-link:active {
+  transform: scale(0.98);
+}
+
+.lookup-link:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
+.lookup-link-title {
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.lookup-url {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--muted);
+  word-break: break-all;
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 /* keep "1 USD =" reading left-to-right in the settings cards */
 .rate-card .rate-label {
   direction: ltr;

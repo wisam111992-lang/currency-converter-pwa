@@ -206,6 +206,28 @@
             <button type="submit" class="btn btn-primary btn-block btn-lg">حفظ</button>
           </form>
 
+          <!-- رابط مساعدة: معرفة أسعار العملات العالمية خارج التطبيق -->
+          <div class="card rate-card lookup-card">
+            <h2>أين أجد السعر؟</h2>
+            <p class="muted-note">
+              لا تعرف سعر عملة مقابل الدولار؟ اضغط الرابط أدناه ليُفتح موقع XE في
+              المتصفح، غيّر العملات على الموقع إلى ما تريد (مثال: من USD إلى EUR)
+              بقيمة 1، انسخ السعر، ثم أعد إدخاله في حقل العملة أعلاه واضغط «حفظ».
+            </p>
+            <a
+              id="lookup-rate-link"
+              class="lookup-link"
+              href="https://www.xe.com/ar/currencyconverter/convert/?Amount=1&amp;From=USD&amp;To=IQD"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span class="lookup-link-title">🔗 فتح موقع XE لمعرفة سعر أي عملة</span>
+              <span class="lookup-url"
+                >xe.com/ar/currencyconverter/convert/?Amount=1&amp;From=USD&amp;To=IQD</span
+              >
+            </a>
+          </div>
+
           <div id="rates-toast" class="toast" hidden role="status"></div>
 
           <p class="last-update" id="last-update" hidden></p>
