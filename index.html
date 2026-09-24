@@ -17,6 +17,23 @@
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="./css/style.css" />
     <title>محول العملات</title>
+    <script>
+      // apply saved/system theme before first paint (no flash)
+      (function () {
+        try {
+          var t = localStorage.getItem('currency_converter.theme.v1');
+          if (t !== 'dark' && t !== 'light') {
+            t =
+              window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+          }
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="app">
@@ -26,7 +43,7 @@
           <img class="setup-logo" src="./icons/icon-192.png" alt="" width="72" height="72" />
           <h1>مرحباً بك</h1>
           <p>حدد أسعار الصرف التي تريد استخدامها</p>
-          <p class="setup-hint">يمكنك إضافة عملات العالم لاحقاً من صفحة «أسعار الصرف».</p>
+          <p class="setup-hint">يمكنك إضافة عملات أخرى (مثل التومان) لاحقًا من «أسعار الصرف».</p>
         </div>
 
         <form id="setup-form" class="card" novalidate>
@@ -45,22 +62,6 @@
             <span class="rate-suffix">دينار عراقي</span>
           </div>
           <p class="field-error" id="setup-iqd-error" hidden></p>
-
-          <div class="rate-row">
-            <label class="rate-label" for="setup-toman">1 دولار =</label>
-            <input
-              id="setup-toman"
-              name="TOMAN"
-              class="rate-input"
-              type="text"
-              inputmode="decimal"
-              autocomplete="off"
-              placeholder="100000"
-              aria-label="سعر صرف التومان"
-            />
-            <span class="rate-suffix">تومان</span>
-          </div>
-          <p class="field-error" id="setup-toman-error" hidden></p>
 
           <button type="submit" class="btn btn-primary btn-block">حفظ وبدء الاستخدام</button>
         </form>
@@ -82,9 +83,12 @@
                 <h1>محول العملات</h1>
               </div>
             </div>
-            <button id="btn-open-rates" class="btn btn-pill" type="button">
-              ⚙ أسعار الصرف
-            </button>
+            <div class="header-actions">
+              <button id="btn-theme" class="btn btn-icon" type="button" aria-label="تبديل الوضع الليلي">🌙</button>
+              <button id="btn-open-rates" class="btn btn-pill" type="button">
+                ⚙ أسعار الصرف
+              </button>
+            </div>
           </div>
           <p class="app-subtitle">الأسعار حسب القيم التي قمت بحفظها</p>
         </header>
@@ -173,33 +177,15 @@
             </div>
 
             <div class="card rate-card">
-              <h2>الدولار والتومان</h2>
-              <div class="rate-row">
-                <label class="rate-label" for="rates-toman">1 USD =</label>
-                <input
-                  id="rates-toman"
-                  name="TOMAN"
-                  class="rate-input"
-                  type="text"
-                  inputmode="decimal"
-                  autocomplete="off"
-                  placeholder="100000"
-                />
-                <span class="rate-suffix">TOMAN</span>
-              </div>
-              <p class="field-error" id="rates-toman-error" hidden></p>
-            </div>
-
-            <div class="card rate-card">
               <h2>العملات العالمية المحفوظة</h2>
               <div id="world-rates-list" class="world-list"></div>
               <p id="world-empty" class="muted-note">
-                لم تضف أي عملة عالمية بعد — مثل اليورو، الريال السعودي، الجنيه المصري…
+                لم تضف أي عملة بعد — مثل التومان، اليورو، الريال السعودي، الجنيه المصري…
               </p>
             </div>
 
             <div class="card rate-card">
-              <h2>إضافة عملة عالمية</h2>
+              <h2>إضافة عملة</h2>
               <p class="muted-note">اختر عملة ثم أدخل سعرها مقابل 1 دولار.</p>
               <div class="add-currency-row">
                 <select id="add-currency-select" class="select" aria-label="اختر عملة"></select>

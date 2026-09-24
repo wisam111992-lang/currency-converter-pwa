@@ -123,10 +123,10 @@ test('direct parse rejects double decimal dots', () => {
 });
 
 test('missing rates → error message', () => {
-  const { ok, errors } = validateRates({ IQD: '', TOMAN: '' });
+  const { ok, errors } = validateRates({ IQD: '', TOMAN: '100000' });
   assert.equal(ok, false);
   assert.equal(errors.IQD, MESSAGES.missingRates);
-  assert.equal(errors.TOMAN, MESSAGES.missingRates);
+  assert.equal(errors.TOMAN, undefined, 'TOMAN is optional now');
 });
 
 test('zero or negative rates → invalid message', () => {
@@ -185,15 +185,34 @@ test('world catalog has no duplicate or reserved codes', () => {
   assert.equal(new Set(codes).size, codes.length, 'no duplicates');
   assert.ok(!codes.includes('USD'), 'USD not in world catalog');
   assert.ok(!codes.includes('IQD'), 'IQD not in world catalog');
-  assert.ok(!codes.includes('TOMAN'), 'TOMAN not in world catalog');
+  assert.ok(codes.includes('TOMAN'), 'TOMAN is optional (world catalog) now');
   assert.ok(codes.length >= 60, 'catalog is substantial');
+});
+
+test('only IQD is required — TOMAN is optional', () => {
+  const { ok, rates, errors } = validateRates({ IQD: '1500' });
+  assert.equal(ok, true);
+  assert.deepEqual(rates, { USD: 1, IQD: 1500 });
+  assert.deepEqual(errors, {});
+});
+
+test('missing IQD still blocks setup', () => {
+  const { ok, errors } = validateRates({ TOMAN: '100000' });
+  assert.equal(ok, false);
+  assert.equal(errors.IQD, MESSAGES.missingRates);
+});
+
+test('present-but-invalid optional rate is rejected', () => {
+  const { ok, errors } = validateRates({ IQD: '1500', TOMAN: 'abc' });
+  assert.equal(ok, false);
+  assert.equal(errors.TOMAN, MESSAGES.invalidRate);
 });
 
 test('world catalog entries have Arabic names', () => {
   for (const c of WORLD_CATALOG) {
     assert.ok(c.nameAr && c.nameAr.length > 1, `${c.code} nameAr`);
     assert.ok(c.shortAr && c.shortAr.length > 1, `${c.code} shortAr`);
-    assert.match(c.code, /^[A-Z]{3}$/, `${c.code} is 3 uppercase letters`);
+    assert.match(c.code, /^[A-Z]{3,6}$/, `${c.code} is 3–6 uppercase letters`);
     assert.ok(Number.isInteger(c.maxDecimals) && c.maxDecimals >= 0, `${c.code} decimals`);
   }
 });
@@ -211,9 +230,9 @@ test('validateRates accepts optional world currencies', () => {
 });
 
 test('validateRates ignores unknown codes but keeps core errors', () => {
-  const { ok, errors } = validateRates({ IQD: '1500', TOMAN: '', FAKE: '5' });
+  const { ok, errors } = validateRates({ IQD: '', TOMAN: '100000', FAKE: '5' });
   assert.equal(ok, false);
-  assert.equal(errors.TOMAN, MESSAGES.missingRates);
+  assert.equal(errors.IQD, MESSAGES.missingRates);
   assert.equal(errors.FAKE, undefined);
 });
 

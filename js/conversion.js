@@ -3,8 +3,8 @@
 
 import { BASE_CURRENCY, isKnownCurrency, roundTo } from './currencies.js';
 
-/** Rates required at all times (the original core currencies). */
-export const REQUIRED_RATE_KEYS = Object.freeze(['IQD', 'TOMAN']);
+/** Rates required at all times (only the Dinar; Dollar is the base). */
+export const REQUIRED_RATE_KEYS = Object.freeze(['IQD']);
 
 export class ConversionError extends Error {
   constructor(message) {
@@ -70,8 +70,8 @@ export function parseAmount(input) {
 
 /**
  * Validate rates coming from the settings form / storage.
- * - core (IQD, TOMAN) are required
- * - any known world currency present in `raw` is optional but must be > 0
+ * - IQD is required (USD is the implicit base)
+ * - any known currency present in `raw` (TOMAN, EUR, …) is optional but must be > 0
  * - unknown codes are ignored (keeps old/corrupt data loadable)
  * @param {Record<string, string|number>} raw
  * @returns {{ok: boolean, rates: Record<string, number>|null, errors: Record<string, string>}}

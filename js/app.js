@@ -23,8 +23,10 @@ import {
   formatTimestamp,
   loadHistory,
   loadRates,
+  loadTheme,
   pushHistory,
   saveRates,
+  saveTheme,
 } from './storage.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -46,9 +48,8 @@ const els = {
   screenRates: $('#screen-rates'),
   setupForm: $('#setup-form'),
   setupIqd: $('#setup-iqd'),
-  setupToman: $('#setup-toman'),
   setupIqdError: $('#setup-iqd-error'),
-  setupTomanError: $('#setup-toman-error'),
+  themeBtn: $('#btn-theme'),
   convertForm: $('#convert-form'),
   fromCurrency: $('#from-currency'),
   toCurrency: $('#to-currency'),
@@ -63,9 +64,7 @@ const els = {
   closeRates: $('#btn-close-rates'),
   ratesForm: $('#rates-form'),
   ratesIqd: $('#rates-iqd'),
-  ratesToman: $('#rates-toman'),
   ratesIqdError: $('#rates-iqd-error'),
-  ratesTomanError: $('#rates-toman-error'),
   ratesToast: $('#rates-toast'),
   lastUpdate: $('#last-update'),
   worldList: $('#world-rates-list'),
@@ -178,11 +177,7 @@ function rebuildCurrencySelects() {
   els.fromCurrency.innerHTML = html;
   els.toCurrency.innerHTML = html;
 
-  els.fromCurrency.value = codes.includes(prevFrom)
-    ? prevFrom
-    : codes.includes('TOMAN')
-      ? 'TOMAN'
-      : codes[0];
+  els.fromCurrency.value = codes.includes(prevFrom) ? prevFrom : codes[0];
 
   const preferredTo = codes.includes('IQD') && els.fromCurrency.value !== 'IQD' ? 'IQD' : null;
   const fallbackTo =
@@ -288,15 +283,13 @@ function refreshLiveResult() {
 
 function bindSetup() {
   bindNumericInput(els.setupIqd, () => setError(els.setupIqd, els.setupIqdError, null));
-  bindNumericInput(els.setupToman, () => setError(els.setupToman, els.setupTomanError, null));
 
   els.setupForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const raw = { IQD: els.setupIqd.value, TOMAN: els.setupToman.value };
+    const raw = { IQD: els.setupIqd.value };
     const { ok, rates: next, errors } = validateRates(raw);
 
     setError(els.setupIqd, els.setupIqdError, errors.IQD);
-    setError(els.setupToman, els.setupTomanError, errors.TOMAN);
     if (!ok) return;
 
     const saved = saveRates(next);
@@ -421,9 +414,7 @@ function fillAddSelect() {
 function openRatesScreen() {
   ratesDraft = { ...(rates || {}) };
   els.ratesIqd.value = ratesDraft.IQD ? groupNumeric(String(ratesDraft.IQD)) : '';
-  els.ratesToman.value = ratesDraft.TOMAN ? groupNumeric(String(ratesDraft.TOMAN)) : '';
   setError(els.ratesIqd, els.ratesIqdError, null);
-  setError(els.ratesToman, els.ratesTomanError, null);
   setError(null, els.addError, null);
   els.addRate.value = '';
   els.addRate.classList.remove('invalid');
@@ -434,7 +425,6 @@ function openRatesScreen() {
 
 function bindRates() {
   bindNumericInput(els.ratesIqd, () => setError(els.ratesIqd, els.ratesIqdError, null));
-  bindNumericInput(els.ratesToman, () => setError(els.ratesToman, els.ratesTomanError, null));
   bindNumericInput(els.addRate, () => setError(els.addRate, els.addError, null));
 
   els.openRates.addEventListener('click', openRatesScreen);
@@ -489,12 +479,10 @@ function bindRates() {
     e.preventDefault();
     ratesDraft = ratesDraft || { ...(rates || {}) };
     ratesDraft.IQD = els.ratesIqd.value;
-    ratesDraft.TOMAN = els.ratesToman.value;
 
     const { ok, rates: next, errors } = validateRates(ratesDraft);
 
     setError(els.ratesIqd, els.ratesIqdError, errors.IQD);
-    setError(els.ratesToman, els.ratesTomanError, errors.TOMAN);
 
     // world row errors
     for (const row of els.worldList.querySelectorAll('.world-row')) {
@@ -530,6 +518,44 @@ function bindRates() {
   });
 }
 
+/* ─────────────── theme (light / dark) ─────────────── */
+
+function currentTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+}
+
+function renderThemeButton() {
+  if (!els.themeBtn) return;
+  const dark = currentTheme() === 'dark';
+  els.themeBtn.textContent = dark ? '☀️' : '🌙';
+  els.themeBtn.setAttribute(
+    'aria-label',
+    dark ? 'تفعيل الوضع النهاري' : 'تفعيل الوضع الليلي'
+  );
+  els.themeBtn.setAttribute('title', dark ? 'الوضع النهاري' : 'الوضع الليلي');
+}
+
+function bindTheme() {
+  // ensure an explicit theme is present (system preference may apply otherwise)
+  if (!document.documentElement.getAttribute('data-theme')) {
+    const prefersDark =
+      window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+  }
+
+  els.themeBtn?.addEventListener('click', () => {
+    const next = currentTheme() === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    saveTheme(next);
+    renderThemeButton();
+  });
+
+  // honor a stored choice even if the inline head script was bypassed
+  const stored = loadTheme();
+  if (stored) document.documentElement.setAttribute('data-theme', stored);
+  renderThemeButton();
+}
+
 /* ─────────────── boot ─────────────── */
 
 function enterMain() {
@@ -542,6 +568,7 @@ function init() {
   bindSetup();
   bindConverter();
   bindRates();
+  bindTheme();
 
   const loaded = loadRates();
   if (loaded.usdRates) {

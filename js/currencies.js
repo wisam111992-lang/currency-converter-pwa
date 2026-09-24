@@ -4,7 +4,7 @@
 
 export const BASE_CURRENCY = 'USD';
 
-/** Always available — the app's original three currencies. */
+/** Always available — Dollar + Dinar only (the fixed core). */
 export const CORE_CURRENCIES = Object.freeze([
   {
     code: 'USD',
@@ -20,20 +20,14 @@ export const CORE_CURRENCIES = Object.freeze([
     symbol: 'IQD',
     maxDecimals: 2,
   },
-  {
-    code: 'TOMAN',
-    nameAr: 'التومان الإيراني',
-    shortAr: 'تومان',
-    symbol: 'TOMAN',
-    maxDecimals: 2,
-  },
 ]);
 
 /**
- * World currencies the user may add from settings.
+ * World currencies the user may add from settings (TOMAN included).
  * Each needs a user-entered rate (1 USD = X) — never fetched from the internet.
  */
 export const WORLD_CATALOG = Object.freeze([
+  { code: 'TOMAN', nameAr: 'التومان الإيراني', shortAr: 'تومان', symbol: 'TOMAN', maxDecimals: 2 },
   // العربية والشرق الأوسط
   { code: 'SAR', nameAr: 'الريال السعودي', shortAr: 'ريال سعودي', symbol: 'SAR', maxDecimals: 2 },
   { code: 'AED', nameAr: 'الدرهم الإماراتي', shortAr: 'درهم إماراتي', symbol: 'AED', maxDecimals: 2 },

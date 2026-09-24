@@ -27,6 +27,8 @@ const {
   pushHistory,
   clearHistory,
   formatTimestamp,
+  loadTheme,
+  saveTheme,
 } = await import('../js/storage.js');
 
 let passed = 0;
@@ -121,6 +123,42 @@ test('storage with invalid core rates is treated as not configured', () => {
     JSON.stringify({ rates: { IQD: 0, TOMAN: -1 }, updatedAt: null })
   );
   assert.equal(loadRates().usdRates, null);
+});
+
+test('IQD-only storage loads (TOMAN now optional)', () => {
+  window.localStorage.setItem(
+    'currency_converter.rates.v1',
+    JSON.stringify({ rates: { USD: 1, IQD: 1500 }, updatedAt: '2026-09-24T10:00:00.000Z' })
+  );
+  assert.deepEqual(loadRates().usdRates, { USD: 1, IQD: 1500 });
+});
+
+test('storage without IQD is treated as not configured', () => {
+  window.localStorage.setItem(
+    'currency_converter.rates.v1',
+    JSON.stringify({ rates: { USD: 1, TOMAN: 100000 }, updatedAt: null })
+  );
+  assert.equal(loadRates().usdRates, null);
+});
+
+console.log('\n— الوضع الليلي —');
+
+test('no theme chosen initially', () => {
+  assert.equal(loadTheme(), null);
+});
+
+test('save + load dark theme', () => {
+  saveTheme('dark');
+  assert.equal(loadTheme(), 'dark');
+  saveTheme('light');
+  assert.equal(loadTheme(), 'light');
+});
+
+test('invalid theme values are ignored', () => {
+  saveTheme('purple');
+  assert.equal(loadTheme(), 'light', 'previous valid value kept');
+  window.localStorage.setItem('currency_converter.theme.v1', 'banana');
+  assert.equal(loadTheme(), null, 'corrupt value → null (follow system)');
 });
 
 console.log('\n— سجل التحويلات —');

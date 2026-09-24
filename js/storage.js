@@ -4,6 +4,7 @@ import { validateRates } from './conversion.js';
 
 const KEY_RATES = 'currency_converter.rates.v1';
 const KEY_HISTORY = 'currency_converter.history.v1';
+const KEY_THEME = 'currency_converter.theme.v1';
 const HISTORY_LIMIT = 10;
 
 function safeGet(key) {
@@ -112,4 +113,16 @@ export function formatTimestamp(iso) {
     hour12: true,
   }).format(d);
   return `${date} - ${time}`;
+}
+
+// --- theme (light / dark) ---
+
+/** @returns {'dark'|'light'|null} null = user never chose (follow system) */
+export function loadTheme() {
+  const value = safeGet(KEY_THEME);
+  return value === 'dark' || value === 'light' ? value : null;
+}
+
+export function saveTheme(mode) {
+  if (mode === 'dark' || mode === 'light') safeSet(KEY_THEME, mode);
 }
