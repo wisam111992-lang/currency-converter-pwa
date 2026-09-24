@@ -70,8 +70,19 @@
       <section id="screen-main" class="screen" hidden>
         <header class="app-header">
           <div class="app-header-row">
-            <h1>محول العملات</h1>
-            <button id="btn-open-rates" class="btn btn-ghost" type="button">
+            <div class="brand">
+              <img
+                class="brand-logo"
+                src="./icons/icon-192.png"
+                alt=""
+                width="44"
+                height="44"
+              />
+              <div class="brand-text">
+                <h1>محول العملات</h1>
+              </div>
+            </div>
+            <button id="btn-open-rates" class="btn btn-pill" type="button">
               ⚙ أسعار الصرف
             </button>
           </div>
@@ -96,16 +107,18 @@
               </div>
             </div>
 
-            <label class="amount-label" for="amount-input">المبلغ</label>
-            <input
-              id="amount-input"
-              class="amount-input"
-              type="text"
-              inputmode="decimal"
-              autocomplete="off"
-              placeholder="0"
-              aria-label="المبلغ المراد تحويله"
-            />
+            <div class="amount-field">
+              <label class="amount-label" for="amount-input">المبلغ</label>
+              <input
+                id="amount-input"
+                class="amount-input"
+                type="text"
+                inputmode="decimal"
+                autocomplete="off"
+                placeholder="0"
+                aria-label="المبلغ المراد تحويله"
+              />
+            </div>
             <p class="field-error" id="amount-error" hidden></p>
 
             <button type="submit" class="btn btn-primary btn-block btn-lg">تحويل</button>

@@ -103,11 +103,11 @@ function setError(input, errorEl, message) {
   }
 }
 
-/** Active currency codes in display order (core first, then added world). */
+/** Active currency codes in display order (core always + added world). */
 function activeCodes() {
-  const source = rates || {};
-  const saved = new Set(Object.keys(source));
-  saved.add(BASE_CURRENCY);
+  if (!rates) return [...CORE_CODES]; // before first save: core only
+  const saved = new Set(Object.keys(rates));
+  for (const code of [...CORE_CODES, BASE_CURRENCY]) saved.add(code);
   return CATALOG_ORDER.filter((code) => saved.has(code));
 }
 
@@ -184,7 +184,9 @@ function rebuildCurrencySelects() {
       ? 'TOMAN'
       : codes[0];
 
-  const fallbackTo = codes.find((c) => c !== els.fromCurrency.value) || codes[0];
+  const preferredTo = codes.includes('IQD') && els.fromCurrency.value !== 'IQD' ? 'IQD' : null;
+  const fallbackTo =
+    preferredTo || codes.find((c) => c !== els.fromCurrency.value) || codes[0];
   els.toCurrency.value =
     codes.includes(prevTo) && prevTo !== els.fromCurrency.value ? prevTo : fallbackTo;
 }
@@ -216,9 +218,12 @@ function renderResults(fromCode, amount) {
     .map((t) => {
       const cur = getCurrency(t.code);
       return `
-        <article class="result-row">
-          <span class="rr-name">${cur.nameAr}</span>
-          <span class="rr-value">${formatAmount(t.value, t.code)}</span>
+        <article class="result-row" data-code="${t.code}">
+          <span class="rr-avatar">${t.code}</span>
+          <span class="rr-info">
+            <span class="rr-name">${cur.nameAr}</span>
+            <span class="rr-value">${formatAmount(t.value, t.code)}</span>
+          </span>
         </article>`;
     })
     .join('');
