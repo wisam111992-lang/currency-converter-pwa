@@ -39,7 +39,8 @@ https://wisam111992-lang.github.io/currency-converter-pwa/
 | `js/conversion.js` | منطق التحويل والتحقق (نقي، بدون DOM) |
 | `js/storage.js` | Local Storage service (الأسعار + السجل) |
 | `js/app.js` | طبقة الواجهة (UI) |
-| `css/style.css` | تصميم Mobile First عربي RTL |
+| `css/style.css` | تصميم Mobile First عربي RTL + `@font-face` لخط Cairo |
+| `fonts/` | ملفات خط Cairo محليًا (woff2) — بدون إنترنت |
 | `sw.js` | Service Worker للعمل Offline |
 | `manifest.json` | بيانات PWA (الاسم، الأيقونات، standalone) |
 | `icons/` | أيقونات التطبيق |

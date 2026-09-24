@@ -1,6 +1,6 @@
 /* Service Worker — offline-first cache. No network calls for rates, ever. */
 
-const CACHE_NAME = 'currency-converter-v5'; // bump on every release → devices refresh
+const CACHE_NAME = 'currency-converter-v6'; // bump on every release → devices refresh
 
 const PRECACHE_URLS = [
   './',
@@ -11,6 +11,9 @@ const PRECACHE_URLS = [
   './js/currencies.js',
   './js/conversion.js',
   './js/storage.js',
+  './fonts/cairo-arabic.woff2',
+  './fonts/cairo-latin-ext.woff2',
+  './fonts/cairo-latin.woff2',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
